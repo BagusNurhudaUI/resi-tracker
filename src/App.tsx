@@ -1,136 +1,44 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
-import { deleteScan, listScans, type Fields, type Scan } from './db'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { clearScans, deleteScan, listScans, type Scan } from './db'
+import { Icon, type IconName } from './icons'
+import { duplicateIds, exportCsv } from './lib'
 import { queueOcr, scanPhoto, warmUpOcr } from './scan'
+import { DataView } from './views/DataView'
+import { Detail } from './views/Detail'
+import { Home } from './views/Home'
+import { SettingsView } from './views/SettingsView'
+import { StatsView } from './views/StatsView'
 
-const FIELD_LABELS: [keyof Fields, string][] = [
-  ['product', 'Product'],
-  ['color', 'Color'],
-  ['capacity', 'Capacity'],
-  ['partNo', 'Part no.'],
-  ['model', 'Model'],
-  ['serial', 'Serial'],
-  ['imei1', 'IMEI 1'],
-  ['imei2', 'IMEI 2'],
-  ['eid', 'EID'],
-  ['upc', 'UPC'],
+// Routes live in the hash (#/data/<id>) so the phone's back button closes sheets and switches tabs.
+function readRoute() {
+  const [page = 'home', id] = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean)
+  return { page, id }
+}
+
+const go = (path: string) => {
+  location.hash = path
+}
+
+const NAV: { page: string; icon: IconName; label: string }[] = [
+  { page: 'home', icon: 'home', label: 'Home' },
+  { page: 'data', icon: 'table', label: 'Data' },
+  { page: 'stats', icon: 'chart', label: 'Stats' },
+  { page: 'settings', icon: 'settings', label: 'Settings' },
 ]
-
-function useObjectUrl(blob: Blob) {
-  const [url, setUrl] = useState<string>()
-  useEffect(() => {
-    const u = URL.createObjectURL(blob)
-    setUrl(u)
-    return () => URL.revokeObjectURL(u)
-  }, [blob])
-  return url
-}
-
-function findDuplicate(scan: Scan, all: Scan[]) {
-  const keys = [scan.fields.serial, scan.fields.imei1].filter(Boolean)
-  return all.find((s) => s.id !== scan.id && keys.some((k) => k === s.fields.serial || k === s.fields.imei1))
-}
-
-function exportCsv(scans: Scan[]) {
-  // ="…" keeps long numbers like IMEI/EID from turning into 3.56E+14 in Excel and Sheets.
-  const cell = (v = '') => (/^\d{10,}$/.test(v) ? `"=""${v}"""` : `"${v.replace(/"/g, '""')}"`)
-  const header = ['Scanned at', ...FIELD_LABELS.map(([, l]) => l), 'Barcodes', 'OCR text']
-  const rows = scans.map((s) => [
-    cell(new Date(s.createdAt).toLocaleString()),
-    ...FIELD_LABELS.map(([k]) => cell(s.fields[k])),
-    cell(s.barcodes.map((b) => `${b.format}:${b.text}`).join(' | ')),
-    cell(s.ocrText ?? ''),
-  ])
-  const csv = [header.map((h) => cell(h)), ...rows].map((r) => r.join(',')).join('\r\n')
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
-  a.download = `resi-scans-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(a.href)
-}
-
-function CopyValue({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <button
-      className="value"
-      onClick={() => {
-        void navigator.clipboard?.writeText(value)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1000)
-      }}
-    >
-      {value}
-      <span className="copy">{copied ? 'Copied' : 'Copy'}</span>
-    </button>
-  )
-}
-
-function ScanCard({ scan, open, onToggle, onDelete, duplicate }: {
-  scan: Scan
-  open: boolean
-  onToggle: () => void
-  onDelete: () => void
-  duplicate: boolean
-}) {
-  const thumb = useObjectUrl(open ? scan.photo : scan.thumb)
-  const f = scan.fields
-  const title = [f.product, f.color, f.capacity].filter(Boolean).join(' · ') || f.serial || 'Unknown item'
-
-  return (
-    <li className={`card${open ? ' open' : ''}`}>
-      <button className="summary" onClick={onToggle}>
-        <img src={thumb} alt="" />
-        <div>
-          <strong>{title}</strong>
-          <span className="sub">{f.serial ? `SN ${f.serial}` : `${scan.barcodes.length} barcodes`}</span>
-          <span className="sub">
-            {new Date(scan.createdAt).toLocaleString()}
-            {scan.ocrStatus === 'pending' && <em className="tag">reading text…</em>}
-            {scan.ocrStatus === 'error' && <em className="tag warn">text failed</em>}
-            {duplicate && <em className="tag warn">duplicate</em>}
-          </span>
-        </div>
-      </button>
-
-      {open && (
-        <div className="details">
-          <dl>
-            {FIELD_LABELS.filter(([k]) => f[k]).map(([k, label]) => (
-              <div key={k}>
-                <dt>{label}</dt>
-                <dd><CopyValue value={f[k]!} /></dd>
-              </div>
-            ))}
-          </dl>
-          {scan.barcodes.length > 0 && (
-            <details>
-              <summary>Raw barcodes ({scan.barcodes.length})</summary>
-              <ul className="raw">
-                {scan.barcodes.map((b, i) => <li key={i}><code>{b.format}</code> {b.text}</li>)}
-              </ul>
-            </details>
-          )}
-          <details>
-            <summary>All text</summary>
-            <pre>{scan.ocrText ?? (scan.ocrStatus === 'pending' ? 'Reading…' : 'No text')}</pre>
-          </details>
-          <button className="danger" onClick={onDelete}>Delete</button>
-        </div>
-      )}
-    </li>
-  )
-}
 
 export default function App() {
   const [scans, setScans] = useState<Scan[]>([])
+  const [route, setRoute] = useState(readRoute)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string>()
-  const [openId, setOpenId] = useState<string>()
-  const [query, setQuery] = useState('')
+  const [toast, setToast] = useState<{ text: string; warn?: boolean }>()
+  const cameraInput = useRef<HTMLInputElement>(null)
+  const galleryInput = useRef<HTMLInputElement>(null)
 
   const refresh = () => listScans().then(setScans)
 
   useEffect(() => {
+    const onHash = () => setRoute(readRoute())
+    addEventListener('hashchange', onHash)
     warmUpOcr()
     void listScans().then((all) => {
       setScans(all)
@@ -138,22 +46,37 @@ export default function App() {
       const pending = all.filter((s) => s.ocrStatus === 'pending').map((s) => s.id)
       if (pending.length) queueOcr(pending, refresh)
     })
+    return () => removeEventListener('hashchange', onHash)
   }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(undefined), 3500)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  const dupes = duplicateIds(scans)
+  const page = route.page === 'search' || route.page === 'dupes' ? 'data' : route.page
+  const detail = route.id ? scans.find((s) => s.id === route.id) : undefined
 
   async function onPhoto(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
     setBusy(true)
-    setError(undefined)
     try {
       const scan = await scanPhoto(file)
-      setOpenId(scan.id)
+      void navigator.storage?.persist?.()
       await refresh()
-      if (!scan.barcodes.length) setError('No barcodes found — the text is still being read. Try a closer, glare-free photo.')
+      setToast(
+        scan.barcodes.length
+          ? { text: `Saved · ${scan.barcodes.length} barcodes read` }
+          : { text: 'No barcodes found. Reading text instead. Try a closer, glare-free photo.', warn: true },
+      )
       queueOcr([scan.id], refresh)
+      go(`/${page}/${scan.id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setToast({ text: err instanceof Error ? err.message : String(err), warn: true })
     } finally {
       setBusy(false)
     }
@@ -163,57 +86,65 @@ export default function App() {
     if (!confirm('Delete this scan?')) return
     await deleteScan(id)
     await refresh()
+    history.back()
   }
 
-  const q = query.trim().toLowerCase()
-  const shown = q
-    ? scans.filter((s) =>
-        [...Object.values(s.fields), ...s.barcodes.map((b) => b.text), s.ocrText ?? '']
-          .some((v) => v?.toLowerCase().includes(q)))
-    : scans
+  async function onClearAll() {
+    if (!confirm(`Delete all ${scans.length} scans? This can't be undone.`)) return
+    await clearScans()
+    await refresh()
+  }
+
+  const openCamera = () => cameraInput.current?.click()
+  const openGallery = () => galleryInput.current?.click()
+  const openScan = (id: string) => go(`/${route.page}/${id}`)
 
   return (
-    <main>
-      <header>
-        <h1>Resi Tracker</h1>
-        <button className="ghost" disabled={!scans.length} onClick={() => exportCsv(scans)}>
-          Export CSV
-        </button>
-      </header>
-
-      <div className="actions">
-        <label className={`primary${busy ? ' disabled' : ''}`}>
-          {busy ? 'Reading barcodes…' : 'Scan box'}
-          <input type="file" accept="image/*" capture="environment" onChange={onPhoto} disabled={busy} hidden />
-        </label>
-        <label className={`secondary${busy ? ' disabled' : ''}`}>
-          From gallery
-          <input type="file" accept="image/*" onChange={onPhoto} disabled={busy} hidden />
-        </label>
-      </div>
-      {error && <p className="error">{error}</p>}
-
-      <input
-        className="search"
-        type="search"
-        placeholder={`Search ${scans.length} scans (serial, IMEI, text…)`}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-
-      <ul className="list">
-        {shown.map((s) => (
-          <ScanCard
-            key={s.id}
-            scan={s}
-            open={openId === s.id}
-            onToggle={() => setOpenId(openId === s.id ? undefined : s.id)}
-            onDelete={() => void onDelete(s.id)}
-            duplicate={!!findDuplicate(s, scans)}
+    <div className="app">
+      <main>
+        {page === 'home' && (
+          <Home scans={scans} dupes={dupes} go={go} onCamera={openCamera} onGallery={openGallery} onExport={() => exportCsv(scans)} />
+        )}
+        {page === 'data' && (
+          <DataView
+            key={route.page}
+            scans={scans}
+            dupes={dupes}
+            initialFilter={route.page === 'dupes' ? 'dupes' : 'all'}
+            autoFocus={route.page === 'search'}
+            onOpen={openScan}
+            onExport={exportCsv}
           />
+        )}
+        {page === 'stats' && <StatsView scans={scans} dupes={dupes} />}
+        {page === 'settings' && <SettingsView scans={scans} onExport={() => exportCsv(scans)} onClearAll={() => void onClearAll()} />}
+      </main>
+
+      {detail && (
+        <Detail scan={detail} duplicate={dupes.has(detail.id)} onClose={() => history.back()} onDelete={() => void onDelete(detail.id)} />
+      )}
+
+      {toast && <div className={`toast${toast.warn ? ' warn' : ''}`} role="status">{toast.text}</div>}
+
+      <nav className="tabbar">
+        {NAV.slice(0, 2).map((n) => (
+          <button key={n.page} className={page === n.page ? 'on' : undefined} onClick={() => go(`/${n.page}`)}>
+            <Icon name={n.icon} size={22} />{n.label}
+          </button>
         ))}
-      </ul>
-      {!scans.length && <p className="empty">Take a photo of the label on the box. Barcodes are saved instantly; the rest of the text is read in the background.</p>}
-    </main>
+        <button className="fab-slot" onClick={openCamera} disabled={busy}>
+          <span className={`fab${busy ? ' busy' : ''}`}>{busy ? <span className="spinner" /> : <Icon name="scan" size={26} />}</span>
+          {busy ? 'Reading…' : 'Scan'}
+        </button>
+        {NAV.slice(2).map((n) => (
+          <button key={n.page} className={page === n.page ? 'on' : undefined} onClick={() => go(`/${n.page}`)}>
+            <Icon name={n.icon} size={22} />{n.label}
+          </button>
+        ))}
+      </nav>
+
+      <input ref={cameraInput} type="file" accept="image/*" capture="environment" onChange={onPhoto} hidden />
+      <input ref={galleryInput} type="file" accept="image/*" onChange={onPhoto} hidden />
+    </div>
   )
 }

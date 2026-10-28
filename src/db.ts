@@ -57,3 +57,7 @@ export async function putScan(scan: Scan) {
 export async function deleteScan(id: string) {
   await (await dbPromise).delete('scans', id)
 }
+
+export async function clearScans() {
+  await (await dbPromise).clear('scans')
+}

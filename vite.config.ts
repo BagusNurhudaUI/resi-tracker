@@ -18,8 +18,8 @@ export default defineConfig(({ command }) => ({
         name: 'Resi Tracker',
         short_name: 'Resi',
         description: 'Scan box labels and keep the barcodes and text on this device.',
-        theme_color: '#1f6feb',
-        background_color: '#f6f6f4',
+        theme_color: '#16a34a',
+        background_color: '#f1f4f2',
         display: 'standalone',
         start_url: '/',
         icons: [
@@ -34,6 +34,11 @@ export default defineConfig(({ command }) => ({
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         // tesseract.js loads its worker and engine from jsDelivr; keep them for offline use.
         runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/,
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'fonts', cacheableResponse: { statuses: [0, 200] } },
+          },
           {
             urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/,
             handler: 'CacheFirst',

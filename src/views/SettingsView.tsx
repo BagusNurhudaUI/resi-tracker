@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import type { Scan } from '../db'
 import { Icon } from '../icons'
 
-const fmtBytes = (n: number) => (n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.round(n / 1e3)} KB`)
+const fmtBytes = (n: number) =>
+  n > 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.round(n / 1e3)} KB`
 
 interface Props {
   scans: Scan[]
@@ -37,7 +38,7 @@ export function SettingsView({ scans, onExport, onClearAll }: Props) {
           </span>
         </div>
         <div className="row">
-          <span className="row-icon"><Icon name="check" /></span>
+          <span className="row-icon"><Icon name={persisted ? 'check' : 'alert'} /></span>
           <span className="row-main">
             <span className="row-title">Protected from auto-cleanup</span>
             <span className="row-sub">{persisted ? 'Yes, the browser will keep this data' : 'No, the browser may clear it when storage is low. Install the app to protect it.'}</span>

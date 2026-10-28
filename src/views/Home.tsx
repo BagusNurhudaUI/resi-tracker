@@ -60,7 +60,7 @@ export function Home({ scans, dupes, go, onCamera, onGallery, onExport }: Props)
     <>
       <div className="hero-bg">
         <div className="topbar">
-          <span className="brand"><span className="brand-mark"><Icon name="scan" size={18} /></span>Resi <b>Tracker</b></span>
+          <span className="brand"><span className="brand-mark"><Icon name="scan" size={18} /></span><span>Resi <b>Tracker</b></span></span>
           <span className="topbar-actions">
             <button className="icon-btn" aria-label="Search" onClick={() => go('/search')}><Icon name="search" /></button>
             <button className="icon-btn" aria-label="Settings" onClick={() => go('/settings')}><Icon name="settings" /></button>

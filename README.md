@@ -1,78 +1,28 @@
-# React + TypeScript + Vite
+# Resi Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+PWA for scanning product box labels. Take a photo and the app:
 
-Currently, two official plugins are available:
+1. Decodes every barcode in the photo (zxing-wasm, bundled locally) and saves the record to IndexedDB right away.
+2. Reads all the text on the label in the background (tesseract.js) and fills in what barcodes missed: product, color, capacity, part no., model, IMEI 2, EID.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Everything stays in the browser on this device. Use **Export CSV** to get the data out.
 
-## React Compiler
+## Develop
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```sh
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+The dev server runs on HTTPS with a self-signed certificate and listens on your LAN, so you can open
+`https://<your-pc-ip>:5173` on a phone (accept the certificate warning) to test the camera.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Deploy
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Push to a Git repo and import it in Vercel. `vercel.json` sets the build and the caching headers for the
+service worker. `.npmrc` sets `legacy-peer-deps` because the template's `typescript-eslint` doesn't accept TypeScript 7 yet.
 
-```
+## Notes
+
+- The first OCR run downloads the tesseract engine and English data (a few MB) from jsDelivr. After that they're cached, and the app works offline.
+- If barcodes are missed, take the photo closer and tilt the box to get rid of glare from the shrink-wrap.

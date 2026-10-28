@@ -67,18 +67,28 @@ export function detectInvoiceNumber(barcodes: string[], text = '') {
   return text.replace(/(\d) (?=\d)/g, '$1').match(/\b\d{14,24}\b/)?.[0]
 }
 
-// The box under the invoice number reads "Penerima: … | Pengirim: … / Marketplace: …"; each value
-// stops where the next label (or the cell border OCR sees as "|") starts.
-const LABEL_END = String.raw`(?=\s*(?:Penerima|Pengirim|Marketplace|Alamat|No\.?\s*HP|Telp|[|\[\]]|\n|$))`
+// The box under the invoice number reads "Penerima: … | Pengirim: … / Marketplace: …". OCR on photos
+// misreads the labels themselves ("Ponerima.", "Pangirim:"), so they're matched loosely.
+const LABELS = {
+  recipient: String.raw`P[eoa]n[eoa]r[i1l!]ma`,
+  sender: String.raw`P[eoa]ng[i1l!]r[i1l!]m`,
+  marketplace: String.raw`Ma?rk[eco]tp[l1i]ace`,
+}
+// Each value stops where the next label (or the cell border OCR sees as "|") starts.
+const LABEL_END = String.raw`(?=\s*(?:${Object.values(LABELS).join('|')}|Alamat|No\.?\s*HP|Telp|[|\[\]]|\n|$))`
 const field = (text: string, label: string) =>
-  text.match(new RegExp(String.raw`${label}\s*[:;.]?\s*(.+?)` + LABEL_END, 'i'))?.[1].replace(/[^\p{L}\p{N}\s.'*&-]/gu, '').trim() || undefined
+  text
+    .match(new RegExp(String.raw`${label}\s*[:;.,]?\s*(.+?)` + LABEL_END, 'i'))?.[1]
+    .replace(/!/g, 'l') // "Rag!" is "Ragil"'s l
+    .replace(/[^\p{L}\p{N}\s.'*&-]/gu, '')
+    .trim() || undefined
 
 /** Recipient from "Penerima: <name>". */
-export const detectRecipient = (text: string) => field(text, 'Penerima')
+export const detectRecipient = (text: string) => field(text, LABELS.recipient)
 /** Seller from "Pengirim: <name>". */
-export const detectSender = (text: string) => field(text, 'Pengirim')
+export const detectSender = (text: string) => field(text, LABELS.sender)
 /** Marketplace from "Marketplace: <name>". */
-export const detectMarketplace = (text: string) => field(text, 'Marketplace')
+export const detectMarketplace = (text: string) => field(text, LABELS.marketplace)
 
 /** Everything read from the strip under the invoice number. */
 export const labelParts = (text: string) => ({

@@ -16,6 +16,9 @@ function luhn(digits: string) {
 
 const isImei = (s: string) => /^\d{15}$/.test(s) && luhn(s)
 
+/** EIDs carry an ISO 7064 check: the whole 32-digit number mod 97 is 1. Catches OCR misreads. */
+const isEid = (s: string) => /^89\d{30}$/.test(s) && BigInt(s) % 97n === 1n
+
 export function classifyBarcodes(results: ReadResult[]): Fields {
   const fields: Fields = {}
   const imeis: { text: string; x: number; y: number }[] = []
@@ -47,7 +50,7 @@ export function parseOcr(text: string): Fields {
   const digits = (re: RegExp) => flat.match(re)?.[1].replace(/ /g, '')
 
   const eid = digits(/EID ?:? ?((?:\d ?){32})/i)
-  if (eid) f.eid = eid
+  if (eid && isEid(eid)) f.eid = eid
 
   const imei2 = digits(/IMEI ?2 ?:? ?((?:\d ?){15})/i)
   if (imei2 && isImei(imei2)) f.imei2 = imei2

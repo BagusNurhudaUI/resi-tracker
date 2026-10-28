@@ -34,10 +34,11 @@ interface Props {
   onAssign: (invoice: string | undefined) => void
   onScanInvoice: (photo: Blob) => void
   readingInvoice: boolean
+  onReread: () => void
 }
 
 export function Detail({
-  scan, order, orders, picked, duplicate, onClose, onDelete, onOpenOrder, onAssign, onScanInvoice, readingInvoice,
+  scan, order, orders, picked, duplicate, onClose, onDelete, onOpenOrder, onAssign, onScanInvoice, readingInvoice, onReread,
 }: Props) {
   const invoiceCam = useRef<HTMLInputElement>(null)
   const invoiceGallery = useRef<HTMLInputElement>(null)
@@ -105,6 +106,11 @@ export function Detail({
               </div>
             ))}
             {!FIELD_LABELS.some(([k]) => f[k]) && <p className="empty">No fields recognised yet.</p>}
+            {scan.ocrStatus !== 'pending' && (
+              <button className="link small reread" onClick={onReread}>
+                <Icon name="text" size={14} /> Read label again
+              </button>
+            )}
           </div>
 
           {scan.invoice?.photo && (

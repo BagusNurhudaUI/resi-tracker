@@ -1,12 +1,11 @@
 import { useRef, useState, type ChangeEvent, type RefObject } from 'react'
-import { PSM } from 'tesseract.js'
 import { patchScan, type MatchedBy, type Order, type Scan } from '../db'
 import { Icon } from '../icons'
 import { fmtTime, scanTitle, useObjectUrl } from '../lib'
 import {
   detectInvoiceNumber, findOrderByNumber, labelParts, nameCheck, productCheck, suggestByName,
 } from '../orders'
-import { ocr, queueOcr, readInvoice, scanPhoto } from '../scan'
+import { queueOcr, readInvoice, scanPhoto } from '../scan'
 import { CheckRow, Progress, Sheet } from '../ui'
 import { OrderPicker } from './OrderPicker'
 
@@ -90,12 +89,12 @@ export function Pickup({ orders, picked, scans, dupes, preselect, onSaved, onClo
     setError(undefined)
     setPhase('reading')
     try {
-      const { photo, ocrImage, fromStrip, barcodes } = await readInvoice(file)
-      const textP = ocr(ocrImage, 1, PSM.SPARSE_TEXT)
+      const { photo, barcodes, details } = await readInvoice(file)
+      const textP = details.then((d) => d.text)
       textJob.current = textP
       const hit = findOrderByNumber(orders, barcodes)
       const base: Invoice = {
-        photo, barcodes, strip: fromStrip ? ocrImage : undefined, order: hit?.order, exact: hit?.exact,
+        photo, barcodes, order: hit?.order, exact: hit?.exact,
         matchedBy: hit ? 'invoice' : 'none',
         number: hit?.order.invoice ?? detectInvoiceNumber(barcodes),
       }
@@ -104,16 +103,19 @@ export function Pickup({ orders, picked, scans, dupes, preselect, onSaved, onClo
       if (hit) {
         // Barcode was enough; let the name check fill in when the text arrives.
         setPhase('box')
-        textP
-          .then((text) => textJob.current === textP && setInv((i) => ({ ...i, ...labelParts(text) })))
+        details
+          .then((d) => textJob.current === textP && setInv((i) => ({ ...i, ...labelParts(d.text), strip: d.strip })))
           .catch(() => {})
         return
       }
 
-      const text = await textP.catch(() => '')
+      const { text, strip } = await details.catch((err) => {
+        console.error('Reading the invoice text failed', err)
+        return { text: '', strip: undefined }
+      })
       const hit2 = findOrderByNumber(orders, [...barcodes, text])
       setInv({
-        ...base, ...labelParts(text), order: hit2?.order, exact: hit2?.exact,
+        ...base, ...labelParts(text), strip, order: hit2?.order, exact: hit2?.exact,
         matchedBy: hit2 ? 'invoice' : 'none',
         number: hit2?.order.invoice ?? detectInvoiceNumber(barcodes, text),
       })

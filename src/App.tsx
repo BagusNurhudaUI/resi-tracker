@@ -7,7 +7,7 @@ import { duplicateIds, exportCsv, exportOrdersCsv } from './lib'
 import { invoiceNameCheck, readInvoiceForOrder } from './invoice'
 import { linkOrders } from './orders'
 import { normalizeCapacity } from './parse'
-import { queueOcr, scanPhoto, warmUpOcr } from './scan'
+import { queueOcr, rereadScan, scanPhoto, warmUpOcr } from './scan'
 import { DataView } from './views/DataView'
 import { Detail } from './views/Detail'
 import { Home } from './views/Home'
@@ -243,6 +243,7 @@ export default function App() {
           onOpenOrder={(inv) => go(`${here}/order/${encodeURIComponent(inv)}`)}
           onAssign={(inv) => void assign(scanDetail.id, inv)}
           onScanInvoice={(photo) => void scanInvoiceFor(scanDetail.id, photo)}
+          onReread={() => void rereadScan(scanDetail.id, refresh).then(refresh)}
           readingInvoice={readingInvoice}
         />
       )}

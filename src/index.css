@@ -357,3 +357,4 @@ td .pill { margin-left: 6px; }
 .strip { display: block; width: 100%; border-radius: 8px; margin: 8px 0 4px; border: 1px solid var(--border); background: #fff; }
 .outside-box { display: grid; gap: 10px; }
 .outside-box .banner { padding: 0; background: none; border: 0; }
+.reread { display: inline-flex; align-items: center; gap: 4px; margin: 6px 0 4px; }

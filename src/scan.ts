@@ -17,6 +17,11 @@ const FULL_MAX = 4096
 const PHOTO_MAX = 2000
 const THUMB_MAX = 320
 
+// crypto.randomUUID only exists on HTTPS and newer browsers; getRandomValues works everywhere.
+const newId = () =>
+  Date.now().toString(36) +
+  Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('')
+
 function drawScaled(bitmap: ImageBitmap, max: number) {
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
   const canvas = document.createElement('canvas')
@@ -57,7 +62,7 @@ export async function scanPhoto(file: Blob): Promise<Scan> {
     ])
 
     const scan: Scan = {
-      id: crypto.randomUUID(),
+      id: newId(),
       createdAt: Date.now(),
       photo,
       thumb,

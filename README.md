@@ -1,11 +1,15 @@
 # Resi Tracker
 
-PWA for scanning product box labels. Take a photo and the app:
+PWA for checking order pickups: match each box's IMEI to the order it was picked for.
 
-1. Decodes every barcode in the photo (zxing-wasm, bundled locally) and saves the record to IndexedDB right away.
-2. Reads all the text on the label in the background (tesseract.js) and fills in what barcodes missed: product, color, capacity, part no., model, IMEI 2, EID.
+1. **Import orders.** Paste one order per line: `invoice | recipient name | product`.
+2. **Pickup.** Photograph the invoice, then the box label:
+   - The invoice number is read from the invoice barcode (or from the text under it) and matched to an order.
+   - The recipient (Penerima), sender (Pengirim) and marketplace are read from the strip just below the barcode. The recipient is compared loosely with the order name: typos, extra or missing names, and masked names (`a***n`) still match.
+   - The box label's barcodes give IMEI 1, IMEI 2, serial and EID instantly. The label text is read in the background and gives the product, color and capacity, which are checked against the order's product.
+3. **Results.** Orders show as picked or not picked. Boxes that aren't linked to an order show under **Outside orders**. You can link one later with **Scan invoice** or **Pick order**.
 
-Everything stays in the browser on this device. Use **Export CSV** to get the data out.
+Everything stays in the browser on this device (IndexedDB). Use **Export** to get orders with their IMEIs as CSV.
 
 ## Develop
 

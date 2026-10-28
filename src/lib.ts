@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { Fields, Scan } from './db'
+import type { Fields, Order, Scan } from './db'
+import { nameCheck, productCheck } from './orders'
 
 export const FIELD_LABELS: [keyof Fields, string][] = [
   ['product', 'Product'],
@@ -44,22 +45,58 @@ export function matchesQuery(s: Scan, q: string) {
   return hay.some((v) => v?.toLowerCase().includes(q))
 }
 
-export function exportCsv(scans: Scan[]) {
-  // ="…" keeps long numbers like IMEI/EID from turning into 3.56E+14 in Excel and Sheets.
+function downloadCsv(name: string, header: string[], rows: (string | undefined)[][]) {
+  // ="…" keeps long numbers like IMEI/EID/invoice from turning into 3.56E+14 in Excel and Sheets.
   const cell = (v = '') => (/^\d{10,}$/.test(v) ? `"=""${v}"""` : `"${v.replace(/"/g, '""')}"`)
-  const header = ['Scanned at', ...FIELD_LABELS.map(([, l]) => l), 'Barcodes', 'OCR text']
-  const rows = scans.map((s) => [
-    cell(fmtDateTime(s.createdAt)),
-    ...FIELD_LABELS.map(([k]) => cell(s.fields[k])),
-    cell(s.barcodes.map((b) => `${b.format}:${b.text}`).join(' | ')),
-    cell(s.ocrText ?? ''),
-  ])
-  const csv = [header.map((h) => cell(h)), ...rows].map((r) => r.join(',')).join('\r\n')
+  const csv = [header, ...rows].map((r) => r.map(cell).join(',')).join('\r\n')
   const a = document.createElement('a')
   a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
-  a.download = `resi-scans-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `${name}-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(a.href)
+}
+
+export function exportCsv(scans: Scan[]) {
+  downloadCsv(
+    'resi-scans',
+    ['Scanned at', 'Order invoice', ...FIELD_LABELS.map(([, l]) => l), 'Barcodes', 'OCR text'],
+    scans.map((s) => [
+      fmtDateTime(s.createdAt),
+      s.orderId,
+      ...FIELD_LABELS.map(([k]) => s.fields[k]),
+      s.barcodes.map((b) => `${b.format}:${b.text}`).join(' | '),
+      s.ocrText ?? '',
+    ]),
+  )
+}
+
+const CHECK_TEXT = { ok: 'OK', partial: 'Partial', fail: 'Mismatch', pending: '' }
+
+export function exportOrdersCsv(orders: Order[], picked: Map<string, Scan>, outside: Scan[]) {
+  const rows = orders.map((o) => {
+    const s = picked.get(o.invoice)
+    return [
+      o.invoice, o.name, o.product, s ? 'Picked' : 'Not picked',
+      s?.fields.imei1, s?.fields.imei2, s?.fields.serial,
+      s && [s.fields.product, s.fields.color, s.fields.capacity].filter(Boolean).join(' '),
+      s && fmtDateTime(s.createdAt),
+      s?.invoice?.text != null ? CHECK_TEXT[nameCheck(o.name, s.invoice.text, s.invoice.recipient).status] : '',
+      s ? CHECK_TEXT[productCheck(o.product, s.fields).status] : '',
+      s?.invoice?.recipient, s?.invoice?.sender, s?.invoice?.marketplace,
+    ]
+  })
+  const extra = outside.map((s) => [
+    s.invoice?.number ?? '', s.invoice?.recipient ?? '', '', 'Outside orders',
+    s.fields.imei1, s.fields.imei2, s.fields.serial,
+    [s.fields.product, s.fields.color, s.fields.capacity].filter(Boolean).join(' '),
+    fmtDateTime(s.createdAt), '', '',
+    s.invoice?.recipient, s.invoice?.sender, s.invoice?.marketplace,
+  ])
+  downloadCsv(
+    'resi-orders',
+    ['Invoice', 'Name', 'Product', 'Status', 'IMEI 1', 'IMEI 2', 'Serial', 'Box product', 'Picked at', 'Name check', 'Product check', 'Penerima (label)', 'Pengirim', 'Marketplace'],
+    [...rows, ...extra],
+  )
 }
 
 export function useObjectUrl(blob: Blob | undefined) {

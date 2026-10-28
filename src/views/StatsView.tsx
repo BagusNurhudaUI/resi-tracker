@@ -34,7 +34,16 @@ function countBy(scans: Scan[], key: keyof Fields) {
   return [...sorted.slice(0, 5), { label: 'Other', value: sorted.slice(5).reduce((n, i) => n + i.value, 0) }]
 }
 
-export function StatsView({ scans, dupes }: { scans: Scan[]; dupes: Set<string> }) {
+interface Props {
+  scans: Scan[]
+  dupes: Set<string>
+  orderCount: number
+  pickedCount: number
+  outsideCount: number
+  needsCheck: number
+}
+
+export function StatsView({ scans, dupes, orderCount, pickedCount, outsideCount, needsCheck }: Props) {
   const start = new Date().setHours(0, 0, 0, 0)
   const week = scans.filter((s) => s.createdAt >= start - 6 * DAY).length
 
@@ -57,14 +66,18 @@ export function StatsView({ scans, dupes }: { scans: Scan[]; dupes: Set<string> 
       <div className="page-head"><h1>Statistics</h1></div>
 
       <div className="tiles">
-        <div className="card tile"><span>Total</span><b>{scans.length}</b></div>
-        <div className="card tile"><span>Today</span><b>{scans.filter((s) => isToday(s.createdAt)).length}</b></div>
-        <div className="card tile"><span>Last 7 days</span><b>{week}</b></div>
-        <div className="card tile"><span>Duplicates</span><b>{dupes.size}</b></div>
+        <div className="card tile"><span>Orders picked</span><b>{pickedCount}<small> / {orderCount}</small></b></div>
+        <div className="card tile"><span>Not picked</span><b>{orderCount - pickedCount}</b></div>
+        <div className="card tile"><span>Outside orders</span><b>{outsideCount}</b></div>
+        <div className="card tile"><span>Needs check</span><b>{needsCheck}</b></div>
+        <div className="card tile"><span>Boxes today</span><b>{scans.filter((s) => isToday(s.createdAt)).length}</b></div>
+        <div className="card tile"><span>Boxes, last 7 days</span><b>{week}</b></div>
+        <div className="card tile"><span>All boxes</span><b>{scans.length}</b></div>
+        <div className="card tile"><span>Duplicate boxes</span><b>{dupes.size}</b></div>
       </div>
 
       <section className="card pad">
-        <h3 className="card-title">Scans per day</h3>
+        <h3 className="card-title">Boxes scanned per day</h3>
         <div className="columns" role="img" aria-label={days.map((d) => `${d.label}: ${d.value}`).join(', ')}>
           {days.map((d) => (
             <div key={d.label} className="col" title={`${d.label}: ${d.value} scans`}>
@@ -77,7 +90,7 @@ export function StatsView({ scans, dupes }: { scans: Scan[]; dupes: Set<string> 
       </section>
 
       <section className="card pad">
-        <h3 className="card-title">By product</h3>
+        <h3 className="card-title">Boxes by product</h3>
         <Bars items={countBy(scans, 'product')} />
       </section>
 

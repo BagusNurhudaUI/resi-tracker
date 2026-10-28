@@ -7,11 +7,14 @@ const fmtBytes = (n: number) =>
 
 interface Props {
   scans: Scan[]
+  orderCount: number
   onExport: () => void
+  onExportOrders: () => void
   onClearAll: () => void
+  onClearOrders: () => void
 }
 
-export function SettingsView({ scans, onExport, onClearAll }: Props) {
+export function SettingsView({ scans, orderCount, onExport, onExportOrders, onClearAll, onClearOrders }: Props) {
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [persisted, setPersisted] = useState<boolean>()
 
@@ -25,9 +28,14 @@ export function SettingsView({ scans, onExport, onClearAll }: Props) {
       <div className="page-head"><h1>Settings</h1></div>
 
       <div className="card list">
+        <button className="row" onClick={onExportOrders} disabled={!orderCount && !scans.length}>
+          <span className="row-icon"><Icon name="clipboard" /></span>
+          <span className="row-main"><span className="row-title">Export orders to CSV</span><span className="row-sub">{orderCount} orders with IMEI, plus boxes outside orders</span></span>
+          <Icon name="chevronRight" size={18} />
+        </button>
         <button className="row" onClick={onExport} disabled={!scans.length}>
           <span className="row-icon"><Icon name="download" /></span>
-          <span className="row-main"><span className="row-title">Export all to CSV</span><span className="row-sub">{scans.length} scans, opens in Excel or Sheets</span></span>
+          <span className="row-main"><span className="row-title">Export all box scans to CSV</span><span className="row-sub">{scans.length} scans with every field and label text</span></span>
           <Icon name="chevronRight" size={18} />
         </button>
         <div className="row">
@@ -44,9 +52,13 @@ export function SettingsView({ scans, onExport, onClearAll }: Props) {
             <span className="row-sub">{persisted ? 'Yes, the browser will keep this data' : 'No, the browser may clear it when storage is low. Install the app to protect it.'}</span>
           </span>
         </div>
+        <button className="row danger" onClick={onClearOrders} disabled={!orderCount}>
+          <span className="row-icon"><Icon name="trash" /></span>
+          <span className="row-main"><span className="row-title">Delete all orders</span><span className="row-sub">Box scans are kept and move to outside orders.</span></span>
+        </button>
         <button className="row danger" onClick={onClearAll} disabled={!scans.length}>
           <span className="row-icon"><Icon name="trash" /></span>
-          <span className="row-main"><span className="row-title">Delete all scans</span><span className="row-sub">Export first. This can't be undone.</span></span>
+          <span className="row-main"><span className="row-title">Delete all box scans</span><span className="row-sub">Export first. This can't be undone.</span></span>
         </button>
       </div>
 

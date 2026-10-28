@@ -70,12 +70,24 @@ export function parseOcr(text: string): Fields {
       .map((s) => s.trim())
     if (product) f.product = product
     if (color) f.color = color
-    if (capacity) f.capacity = capacity
+    if (capacity) f.capacity = normalizeCapacity(capacity)
   } else {
     const name = flat.match(/Nama Barang\s*:?\s*([^\n]+)/i)
     if (name) f.product = name[1].trim()
   }
   return f
+}
+
+/**
+ * OCR often reads "GB" as "68"/"6B"/"G8" ("256GB" → "25668"). Storage only comes in a few sizes,
+ * so snap to the known size at the start of the text.
+ */
+export function normalizeCapacity(raw: string) {
+  const s = raw.toUpperCase().replace(/\s/g, '').replace(/O/g, '0')
+  const gb = s.match(/^(1024|512|256|128|64|32)/)
+  if (gb) return `${gb[1]}GB`
+  const tb = s.match(/^([1248])(TB|T8|7B)/)
+  return tb ? `${tb[1]}TB` : raw
 }
 
 /** Merge OCR fields under barcode fields; the IMEI captions from OCR decide which IMEI is which. */
